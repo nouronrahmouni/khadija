@@ -51,6 +51,16 @@ export default function Home() {
     });
   };
 
+  // Auto-hide the sword after 5 seconds
+  useEffect(() => {
+    if (swordPosition) {
+      const timer = setTimeout(() => {
+        setSwordPosition(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [swordPosition]);
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden text-center z-10 selection:bg-pink-300">
       <BubbleBackground />
