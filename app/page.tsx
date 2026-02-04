@@ -7,7 +7,7 @@ import BubbleBackground from '@/components/BubbleBackground';
 export default function Home() {
   const [yesClicked, setYesClicked] = useState(false);
   const [noHoverCount, setNoHoverCount] = useState(0);
-  const [noButtonPosition, setNoButtonPosition] = useState({ top: 0, left: 0, position: 'static' as 'static' | 'fixed' });
+  const [noButtonPosition, setNoButtonPosition] = useState({ top: 0, left: 0, position: 'static' as 'static' | 'absolute', zIndex: 50 });
   const [swordPosition, setSwordPosition] = useState<{ top: string; left: string } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -16,94 +16,38 @@ export default function Home() {
   };
 
   const moveNoButton = (e?: React.MouseEvent | React.TouchEvent) => {
-    // Only run on client
-    if (typeof window === 'undefined') return;
+    if (!containerRef.current) return;
 
+    // Get button and container info
     const btn = e?.currentTarget as HTMLElement;
-    let currentRect: DOMRect | null = null;
+    const containerRect = containerRef.current.getBoundingClientRect();
 
+    // 1. Show Sword at the button's CURRENT position (before it hides)
     if (btn) {
-      currentRect = btn.getBoundingClientRect();
-
-      // Strict Viewport Clamping for Sword
-      // Ensure sword doesn't go off-screen (assuming sword is approx 120x120)
-      const swordX = Math.min(Math.max(0, currentRect.left), window.innerWidth - 120);
-      const swordY = Math.min(Math.max(0, currentRect.top), window.innerHeight - 120);
-
+      const rect = btn.getBoundingClientRect();
+      // Only set sword position if it's not already showing (user asked to "sty showing" - don't remove it)
+      // Or maybe update it if they manage to hover again? user said "show image 2 sty showing dont remove it"
+      // Let's just set it.
       setSwordPosition({
-        top: `${swordY}px`,
-        left: `${swordX}px`
+        top: `${rect.top}px`,
+        left: `${rect.left}px`
       });
     }
 
     setNoHoverCount((prev) => prev + 1);
 
-    // Button Dimensions (fallback to standard size if rect unavailable)
-    const btnWidth = currentRect ? currentRect.width : 120;
-    const btnHeight = currentRect ? currentRect.height : 60;
+    // 2. Hide "No" Button
+    // "sty inter th image cover" -> Stay under the image cover.
+    // We move it to the center of the card and set z-index to -1 so it's behind the white cover/image.
 
-    // Viewport Dimensions
-    const maxLeft = window.innerWidth - btnWidth;
-    const maxTop = window.innerHeight - btnHeight;
-
-    // Current Mouse/Touch Position (approximate center of interaction)
-    // If event is missing, assume center of screen
-    let clientX = window.innerWidth / 2;
-    let clientY = window.innerHeight / 2;
-
-    if (e) {
-      if ('touches' in e && e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-      } else if ('clientX' in e) {
-        clientX = (e as React.MouseEvent).clientX;
-        clientY = (e as React.MouseEvent).clientY;
-      }
-    }
-
-    // Movement Logic: Move AWAY from the cursor/touch
-    // Small jump distance (100px - 200px)
-    const jumpDist = 100 + Math.random() * 100;
-
-    // Random angle, but biased away from cursor?? 
-    // Simplification: Random move, then check distance? 
-    // Let's just do random jump in valid area, but keep it 'local' to current position?
-    // User asked for "Use a small movement range (short jumps only)".
-
-    // Let's base it on current button position (or center if static)
-    const startX = currentRect ? currentRect.left : window.innerWidth / 2;
-    const startY = currentRect ? currentRect.top : window.innerHeight / 2;
-
-    const angle = Math.random() * 2 * Math.PI;
-    const moveX = Math.cos(angle) * jumpDist;
-    const moveY = Math.sin(angle) * jumpDist;
-
-    let targetX = startX + moveX;
-    let targetY = startY + moveY;
-
-    // CRITICAL: Strict clamping
-    // 1. Clamp within screen
-    targetX = Math.max(10, Math.min(targetX, maxLeft - 10)); // 10px padding
-    targetY = Math.max(10, Math.min(targetY, maxTop - 10));
-
-    // 2. Ensure it doesn't overlap with the cursor (prevent "stuck under mouse")
-    // Simple check: if too close to mouse, move it to the other side
-    const distToMouse = Math.hypot(targetX - clientX, targetY - clientY);
-    if (distToMouse < 150) {
-      // Too close? Force it to opposite side of screen relative to mouse?
-      // Or just reflect the vector?
-      targetX = startX - moveX;
-      targetY = startY - moveY;
-
-      // Re-clamp reflected position
-      targetX = Math.max(10, Math.min(targetX, maxLeft - 10));
-      targetY = Math.max(10, Math.min(targetY, maxTop - 10));
-    }
+    const centerX = containerRect.width / 2;
+    const centerY = containerRect.height / 2;
 
     setNoButtonPosition({
-      position: 'fixed',
-      top: targetY,
-      left: targetX,
+      position: 'absolute',
+      top: centerY, // Center vertically
+      left: centerX, // Center horizontally
+      zIndex: -1, // HIDE BEHIND everything
     });
   };
 
@@ -170,7 +114,7 @@ export default function Home() {
             </div>
 
             {/* Image with white cover/glow */}
-            <div className="mt-14 mb-10 relative group">
+            <div className="mt-14 mb-10 relative group z-10">
               <div className="absolute -inset-4 bg-white/40 blur-2xl rounded-full group-hover:bg-pink-100/50 transition-colors duration-700 animate-pulse"></div>
               <Image
                 src="/image1.jpeg"
@@ -199,13 +143,14 @@ export default function Home() {
                 onClick={moveNoButton}
                 style={{
                   position: noButtonPosition.position,
-                  top: noButtonPosition.position === 'fixed' ? noButtonPosition.top : 'auto',
-                  left: noButtonPosition.position === 'fixed' ? noButtonPosition.left : 'auto',
-                  transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)', // Snappy spring
-                  // No transform needed for fixed positioning as we calculate strict top/left
-                  transform: 'none',
+                  top: noButtonPosition.position === 'absolute' ? noButtonPosition.top : 'auto',
+                  left: noButtonPosition.position === 'absolute' ? noButtonPosition.left : 'auto',
+                  zIndex: noButtonPosition.zIndex,
+                  transition: 'all 0.5s ease-in-out', // Smooth hide
+                  transform: noButtonPosition.position === 'absolute' ? 'translate(-50%, -50%) scale(0.5)' : 'none', // Shrink when valid
+                  opacity: noButtonPosition.zIndex < 0 ? 0 : 1, // Optional: fade out too? Let's just use z-index for "under cover" feel, but opacity helps "hide" it visually if z-index isn't enough context. Actually z-index -1 might be enough if bg is solid. But let's add opacity 0 for good measure if it's hidden.
                 }}
-                className="bg-white/80 backdrop-blur-sm border-2 border-gray-200 hover:bg-white text-gray-500 hover:text-gray-700 font-bold py-4 px-10 rounded-full text-2xl shadow-xl z-50 whitespace-nowrap cursor-pointer select-none transition-colors"
+                className={`bg-white/80 backdrop-blur-sm border-2 border-gray-200 hover:bg-white text-gray-500 hover:text-gray-700 font-bold py-4 px-10 rounded-full text-2xl shadow-xl whitespace-nowrap cursor-pointer select-none transition-colors ${noButtonPosition.zIndex < 0 ? 'pointer-events-none' : 'z-50'}`}
               >
                 No
               </button>
