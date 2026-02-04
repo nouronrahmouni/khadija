@@ -7,7 +7,7 @@ import BubbleBackground from '@/components/BubbleBackground';
 export default function Home() {
   const [yesClicked, setYesClicked] = useState(false);
   const [noHoverCount, setNoHoverCount] = useState(0);
-  const [noButtonPosition, setNoButtonPosition] = useState({ top: 0, left: 0, position: 'static' as 'static' | 'absolute' });
+  const [noButtonPosition, setNoButtonPosition] = useState({ top: 0, left: 0, position: 'static' as 'static' | 'fixed' });
   const [swordPosition, setSwordPosition] = useState<{ top: string; left: string } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -16,46 +16,94 @@ export default function Home() {
   };
 
   const moveNoButton = (e?: React.MouseEvent | React.TouchEvent) => {
-    if (!containerRef.current) return;
+    // Only run on client
+    if (typeof window === 'undefined') return;
 
-    // Get current button position for the sword *before* moving
     const btn = e?.currentTarget as HTMLElement;
+    let currentRect: DOMRect | null = null;
+
     if (btn) {
-      const rect = btn.getBoundingClientRect();
+      currentRect = btn.getBoundingClientRect();
+
+      // Strict Viewport Clamping for Sword
+      // Ensure sword doesn't go off-screen (assuming sword is approx 120x120)
+      const swordX = Math.min(Math.max(0, currentRect.left), window.innerWidth - 120);
+      const swordY = Math.min(Math.max(0, currentRect.top), window.innerHeight - 120);
+
       setSwordPosition({
-        top: `${rect.top}px`,
-        left: `${rect.left}px`
+        top: `${swordY}px`,
+        left: `${swordX}px`
       });
     }
 
     setNoHoverCount((prev) => prev + 1);
 
-    const containerRect = containerRef.current.getBoundingClientRect();
+    // Button Dimensions (fallback to standard size if rect unavailable)
+    const btnWidth = currentRect ? currentRect.width : 120;
+    const btnHeight = currentRect ? currentRect.height : 60;
 
-    // Position relative to the card center
-    const centerX = containerRect.width / 2;
-    // The image area is the middle of the card
-    const centerY = containerRect.height / 2 + 20;
+    // Viewport Dimensions
+    const maxLeft = window.innerWidth - btnWidth;
+    const maxTop = window.innerHeight - btnHeight;
 
-    // Strict Side-Only Logic: Randomly jump Left or Right
-    // 0 = Left, 1 = Right
-    const side = Math.random() > 0.5 ? 1 : -1;
+    // Current Mouse/Touch Position (approximate center of interaction)
+    // If event is missing, assume center of screen
+    let clientX = window.innerWidth / 2;
+    let clientY = window.innerHeight / 2;
 
-    // Fixed distance: 240px from center (tight to the 380px image sides)
-    const distanceX = 240;
+    if (e) {
+      if ('touches' in e && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else if ('clientX' in e) {
+        clientX = (e as React.MouseEvent).clientX;
+        clientY = (e as React.MouseEvent).clientY;
+      }
+    }
 
-    // Minimal vertical jitter (±10px) to keep it essentially "side-only"
-    const jitterY = (Math.random() - 0.5) * 20;
+    // Movement Logic: Move AWAY from the cursor/touch
+    // Small jump distance (100px - 200px)
+    const jumpDist = 100 + Math.random() * 100;
 
-    const newLeft = centerX + (side * distanceX);
-    const newTop = centerY + jitterY;
+    // Random angle, but biased away from cursor?? 
+    // Simplification: Random move, then check distance? 
+    // Let's just do random jump in valid area, but keep it 'local' to current position?
+    // User asked for "Use a small movement range (short jumps only)".
 
-    // No switch needed, just direct assignment
+    // Let's base it on current button position (or center if static)
+    const startX = currentRect ? currentRect.left : window.innerWidth / 2;
+    const startY = currentRect ? currentRect.top : window.innerHeight / 2;
+
+    const angle = Math.random() * 2 * Math.PI;
+    const moveX = Math.cos(angle) * jumpDist;
+    const moveY = Math.sin(angle) * jumpDist;
+
+    let targetX = startX + moveX;
+    let targetY = startY + moveY;
+
+    // CRITICAL: Strict clamping
+    // 1. Clamp within screen
+    targetX = Math.max(10, Math.min(targetX, maxLeft - 10)); // 10px padding
+    targetY = Math.max(10, Math.min(targetY, maxTop - 10));
+
+    // 2. Ensure it doesn't overlap with the cursor (prevent "stuck under mouse")
+    // Simple check: if too close to mouse, move it to the other side
+    const distToMouse = Math.hypot(targetX - clientX, targetY - clientY);
+    if (distToMouse < 150) {
+      // Too close? Force it to opposite side of screen relative to mouse?
+      // Or just reflect the vector?
+      targetX = startX - moveX;
+      targetY = startY - moveY;
+
+      // Re-clamp reflected position
+      targetX = Math.max(10, Math.min(targetX, maxLeft - 10));
+      targetY = Math.max(10, Math.min(targetY, maxTop - 10));
+    }
 
     setNoButtonPosition({
-      position: 'absolute',
-      top: newTop,
-      left: newLeft,
+      position: 'fixed',
+      top: targetY,
+      left: targetX,
     });
   };
 
@@ -151,10 +199,11 @@ export default function Home() {
                 onClick={moveNoButton}
                 style={{
                   position: noButtonPosition.position,
-                  top: noButtonPosition.position === 'absolute' ? noButtonPosition.top : 'auto',
-                  left: noButtonPosition.position === 'absolute' ? noButtonPosition.left : 'auto',
+                  top: noButtonPosition.position === 'fixed' ? noButtonPosition.top : 'auto',
+                  left: noButtonPosition.position === 'fixed' ? noButtonPosition.left : 'auto',
                   transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)', // Snappy spring
-                  transform: noButtonPosition.position === 'absolute' ? 'translate(-50%, -50%)' : 'none',
+                  // No transform needed for fixed positioning as we calculate strict top/left
+                  transform: 'none',
                 }}
                 className="bg-white/80 backdrop-blur-sm border-2 border-gray-200 hover:bg-white text-gray-500 hover:text-gray-700 font-bold py-4 px-10 rounded-full text-2xl shadow-xl z-50 whitespace-nowrap cursor-pointer select-none transition-colors"
               >
