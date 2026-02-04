@@ -37,33 +37,20 @@ export default function Home() {
     // The image area is the middle of the card
     const centerY = containerRect.height / 2 + 20;
 
-    // Randomly choose one of 4 directions: 0=Top, 1=Bottom, 2=Left, 3=Right
-    const direction = Math.floor(Math.random() * 4);
+    // Strict Side-Only Logic: Randomly jump Left or Right
+    // 0 = Left, 1 = Right
+    const side = Math.random() > 0.5 ? 1 : -1;
 
-    const distance = 240; // Distance from center (fits tight around the 380px image)
-    const jitter = (Math.random() - 0.5) * 40; // Small jitter to keep it organic
+    // Fixed distance: 240px from center (tight to the 380px image sides)
+    const distanceX = 240;
 
-    let newTop = centerY;
-    let newLeft = centerX;
+    // Minimal vertical jitter (±10px) to keep it essentially "side-only"
+    const jitterY = (Math.random() - 0.5) * 20;
 
-    switch (direction) {
-      case 0: // Top
-        newTop = centerY - distance;
-        newLeft = centerX + jitter;
-        break;
-      case 1: // Bottom
-        newTop = centerY + distance;
-        newLeft = centerX + jitter;
-        break;
-      case 2: // Left
-        newLeft = centerX - distance;
-        newTop = centerY + jitter;
-        break;
-      case 3: // Right
-        newLeft = centerX + distance;
-        newTop = centerY + jitter;
-        break;
-    }
+    const newLeft = centerX + (side * distanceX);
+    const newTop = centerY + jitterY;
+
+    // No switch needed, just direct assignment
 
     setNoButtonPosition({
       position: 'absolute',
